@@ -15,7 +15,16 @@ $ git clone git@github.com:qolbudr/flask-nb.git
 ```
 $ cd flask-nb
 $ python3 -m venv venv
-$ source venv/bin/activate
+```
+
+##### on Windows
+```
+$ .\venv\Scripts\activate.bat
+```
+
+##### on MacOS
+```
+$ source venv/bin/activate 
 ```
 
 #### Install dependencies
