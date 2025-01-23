@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.4.1/dist/css/bootstrap.min.css">
+  <title>Gaussian Naive Bayes - Prediction</title>
+</head>
+
+<body>
+  <div id="wrapper" class="p-4"
+    style="height: 100vh; width: 100vw; display: flex; justify-content: center; align-items: center; overflow-y: scroll;">
+    <div class="container col-12 col-lg-5">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title">Gaussian Naive Bayes - Prediction</h5>
+          <!-- FORM -->
+          <div class="row">
+            <div class="col-12" style="align-items: stretch;">
+              <div class="instruction my-3">
+                <ol class="pl-3">
+                  <li>Train model using KFold Cross Validation</li>
+                  <li>Predict your own data</li>
+                </ol>
+              </div>
+
+              <form id="form-training">
+                <div class="row">
+                  <div class="col-12 col-lg-6 mt-2">
+                    <label class="form-label">KFold Cross Validation</label>
+                    <input type="text" name="kfold" class="form-control" placeholder="3,4,10" value="3,4,10" required>
+                  </div>
+                  <div class="col-12 col-lg-6 mt-2">
+                    <div class="form-group mt-1">
+                      <label>Dataset</label>
+                      <input type="file" name="file" class="form-control-file" required>
+                    </div>
+                  </div>
+                  <div class="col-12">
+                    <button type="submit" class="btn btn-primary btn-block mt-4">Submit</button>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="result" class="mt-3" style="display: none">
+        <div class="card">
+          <div class="card-body">
+            <div class="alert alert-success" role="alert" id="conclusion"></div>
+            <h5 class="card-title">Hasil Training</h5>
+            <table class="table table-striped">
+              <thead>
+                <tr>
+                  <th scope="col">Fold</th>
+                  <th scope="col">K</th>
+                  <th scope="col">Test Accuracy</th>
+                  <th scope="col">Train Accuracy</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-result">
+              </tbody>
+            </table>
+
+            <div class="dropdown-divider my-3"></div>
+
+            <h5 class="card-title">Prediksi Data</h5>
+            <form id="form-predict">
+              <div class="row">
+                <div class="col-12 col-lg-4 mb-2">
+                  <label>Ekspedisi</label>
+                  <select class="form-control" id="select-ekspedisi" name="ekspedisi" required>
+                    <option value="tnc">TNC</option>
+                    <option value="halim">Halim</option>
+                    <option value="ngalimun">Ngalimun</option>
+                    <option value="acmi">ACMI</option>
+                  </select>
+                </div>
+
+                <div class="col-12 col-lg-4 mb-2">
+                  <label>Jumlah Barang Pickup</label>
+                  <input type="number" name="pickup" class="form-control" required>
+                </div>
+
+                <div class="col-12 col-lg-4 mb-2">
+                  <button class="btn btn-primary" style="margin-top: 30px" type="submit">Prediksi</button>
+                </div>
+              </div>
+            </form>
+
+            <div class="alert alert-danger mt-3" role="alert" id="rusak" style="display: none;">Rusak</div>
+            <div class="alert alert-success mt-3" role="alert" id="tidak-rusak" style="display: none;">Tidak Rusak</div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://code.jquery.com/jquery-3.4.1.slim.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.4.1/dist/js/bootstrap.min.js"></script>
+
+  <script>
+    document.querySelector('#form-training').addEventListener('submit', async (event) => {
+      try {
+        event.preventDefault();
+        const formData = new FormData();
+        const file = document.querySelector('[name=file]');
+        const kfold = document.querySelector('[name=kfold]').value;
+
+        if (file.files[0]) formData.append('file', file.files[0]);
+        formData.append('k_values', `[${kfold}]`);
+
+        const response = await fetch('/train-gaussian', {
+          method: 'POST',
+          body: formData,
+        });
+
+        var json = await response.json()
+
+        document.querySelector('#result').style.display = "block"
+        document.querySelector('#conclusion').innerHTML = `The K-Fold with the highest test accuracy is: K=${json.best_model} with Test Accuracy=${json.best_accuracy}`
+
+        let htmlResult = ``
+
+        json.kfold.forEach((item, k) => {
+          item.forEach((kfold) => {
+            htmlResult += `
+            <tr>
+              <td>${kfold['fold']}</td>
+              <td>${kfold['k']}</td>
+              <td>${kfold['train_accuracy']}</td>
+              <td>${kfold['test_accuracy']}</td>
+            </tr>
+          `
+          })
+        })
+
+        document.querySelector('#tbody-result').innerHTML = htmlResult
+        document.querySelector('#wrapper').style.display = 'block'
+
+        document.querySelector("#form-predict").addEventListener('submit', async (event) => {
+          event.preventDefault();
+          const ekspedisiValue = document.querySelector('#select-ekspedisi').value;
+          const pickupValue = document.querySelector('[name=pickup]').value;
+
+          const response = await fetch(`/predict-gaussian?ekspedisi=${ekspedisiValue}&pickup=${pickupValue}&k=${json.best_model}`);
+          const predictJson = await response.json();
+
+          if (predictJson.prediction === 1) {
+            document.querySelector("#rusak").style.display = "block"
+            document.querySelector("#tidak-rusak").style.display = "none"
+          } else {
+            document.querySelector("#rusak").style.display = "none"
+            document.querySelector("#tidak-rusak").style.display = "block"
+          }
+        })
+      } catch (e) {
+        alert(e)
+      }
+    })
+  </script>
+</body>
+
+</html>

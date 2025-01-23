@@ -3,6 +3,7 @@ import pandas as pd
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.model_selection import cross_val_predict, KFold
 from sklearn.metrics import confusion_matrix, classification_report, accuracy_score
+from gaussian import calculate_train_test_accuracies, plot_accuracy_comparison
 import numpy as np
 import os
 import pickle
@@ -168,7 +169,60 @@ def predict_multinomial():
 
 @app.route('/multinomial')
 def multinomial():
-     return render_template('multinomial.html')
+    return render_template('multinomial.html')
+
+@app.route('/train-gaussian', methods=['POST'])
+def train_gaussian():
+     k_values = json.loads(request.form['k_values'])
+
+     file = request.files['file']
+     file_path = os.path.join('./assets/dataset', 'gaussian.xlsx')
+     file.save(file_path)
+     
+     # load dataset
+     file_path = os.path.join('./assets/dataset', 'gaussian.xlsx')
+     df = pd.read_excel(file_path)
+
+     X = df[['Jumlah Barang yang Di Pick Up', 'acmi', 'halim', 'ngalimun', 'tnc']]
+     y = (df['Jumlah Barang yang Rusak'] > 0).astype(int)
+
+     avg_train_accuracies, avg_test_accuracies, best_k, kfold_array, best_test_accuracy = plot_accuracy_comparison(X, y, k_values)
+     
+     response = {
+          'best_model': best_k,
+          'best_accuracy': best_test_accuracy,
+          'kfold': kfold_array
+     }
+
+     return jsonify(response)
+
+@app.route('/predict-gaussian')
+def predict_gaussian():
+     pickup = request.args.get('pickup')
+     ekspedisi = request.args.get('ekspedisi')
+     k = request.args.get('k')
+
+     # 1. Load the saved model
+     with open(f"./assets/model/gaussian_k{k}.pkl", "rb") as f:
+        model = pickle.load(f)
+
+     # 2. Prepare input data for prediction
+     # Example input: Replace with your actual test data
+     new_data = np.array([[int(pickup), 1 if(ekspedisi == "acmi") else 0, 1 if(ekspedisi == "halim") else 0, 1 if(ekspedisi == "ngalimun") else 0, 1 if(ekspedisi == "tnc") else 0]])
+
+     # 3. Predict the label
+     predictions = model.predict(new_data)
+
+     response = {
+         "prediction": predictions[0].item()
+     }
+
+     return jsonify(response)
+
+@app.route('/gaussian')
+def gaussian():
+    return render_template('gaussian.html')
+     
 
 if __name__ == '__main__':
 	app.run(debug=True)
